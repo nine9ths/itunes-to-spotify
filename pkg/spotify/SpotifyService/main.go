@@ -2,6 +2,7 @@ package SpotifyService
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"github.com/skyerus/itunes-to-spotify/pkg/models"
@@ -14,6 +15,7 @@ import (
 
 const SpotifyBaseUrl = "https://api.spotify.com/v1"
 const SpotifySearchEndpoint = "/search"
+const SpotifyPlaylistsEndpoint = "/playlists"
 
 type spotifyService struct {
 	Token string
@@ -109,4 +111,50 @@ func (s spotifyService) SearchSongs(songs []models.Song) ([]models.SpotifySearch
 	}
 
 	return results, nonexistentSongs, nil
+}
+
+func (s spotifyService) CreateSpotifyPlaylist(name string) error {
+	var playlistPayload models.SpotifyPlaylist
+	playlistPayload.Name = name
+
+	client := &http.Client{}
+
+	bodyBytes, err := json.Marshal(playlistPayload)
+	if err != nil {
+		return err
+	}
+	b := bytes.NewBuffer(bodyBytes)
+
+	request, err := http.NewRequest("POST", SpotifyBaseUrl + SpotifyPlaylistsEndpoint, b)
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Authorization", "Bearer " + s.Token)
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusUnauthorized {
+		return errors.New("access token is unauthorized, it might have expired")
+	}
+
+	if response.StatusCode >= 300 {
+		bodyBytes, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(string(bodyBytes))
+	}
+}
+
+func (s spotifyService) AddResultsToSpotifyPlaylist([]models.SpotifySearchSimple) error {
+
+}
+
+func (s spotifyService) AddNonexistentToFile([]models.Song) error {
+	panic("implement me")
 }

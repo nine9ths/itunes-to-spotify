@@ -22,3 +22,11 @@ type SpotifyItem struct {
 type SpotifySearchSimple struct {
 	URI string `json:"uri"`
 }
+
+type SpotifyPlaylist struct {
+	Name string `json:"name"`
+}
+
+type SpotifyPlaylistObject struct {
+
+}
