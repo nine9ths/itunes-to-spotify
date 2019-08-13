@@ -43,47 +43,70 @@ func (s spotifyService) ReadSongs(inputFile io.Reader) ([]models.Song, error) {
 	return songs, nil
 }
 
-func (s spotifyService) SearchSong(song models.Song) (models.SpotifySearchSimple, error) {
+func (s spotifyService) SearchSong(song models.Song) (result models.SpotifySearchSimple, success bool, err error) {
 	var simpleSearchResponse models.SpotifySearchSimple
 	client := &http.Client{}
 
 	request, err := http.NewRequest("GET", SpotifyBaseUrl + SpotifySearchEndpoint + "?q=" + song.Artist + "%20" + song.Name, nil)
 	if err != nil {
-		return simpleSearchResponse, err
+		return simpleSearchResponse, false, err
 	}
 
 	request.Header.Set("Authorization", "Bearer " + s.Token)
 
 	response, err := client.Do(request)
 	if err != nil {
-		return simpleSearchResponse, err
+		return simpleSearchResponse, false, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode == http.StatusUnauthorized {
-		return simpleSearchResponse, errors.New("access token is unauthorized, it might have expired")
+		return simpleSearchResponse, false, errors.New("access token is unauthorized, it might have expired")
 	}
 
 	if response.StatusCode >= 300 {
 		bodyBytes, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			return simpleSearchResponse, err
+			return simpleSearchResponse, false, err
 		}
-		return simpleSearchResponse, errors.New(string(bodyBytes))
+		return simpleSearchResponse, false, errors.New(string(bodyBytes))
 	}
 
 	var spotifySearch models.SpotifySearch
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return simpleSearchResponse, err
+		return simpleSearchResponse, false, err
 	}
 	err = json.Unmarshal(body, &spotifySearch)
 	if err != nil {
-		return simpleSearchResponse, err
+		return simpleSearchResponse, false, err
 	}
 
 	if len(spotifySearch.Tracks.Items) < 1 {
-		return simpleSearchResponse, errors.New()
+		return simpleSearchResponse, false, nil
 	}
+
+	simpleSearchResponse.URI = spotifySearch.Tracks.Items[0].URI
+
+	return simpleSearchResponse, true, nil
+}
+
+func (s spotifyService) SearchSongs(songs []models.Song) ([]models.SpotifySearchSimple, []models.Song, error) {
+	results := make([]models.SpotifySearchSimple, 0, len(songs))
+	nonexistentSongs := make([]models.Song, 0, len(songs))
+
+	for i := 0; i < len(songs); i++ {
+		result, success, err := s.SearchSong(songs[i])
+		if err != nil {
+			return results, nonexistentSongs, err
+		}
+		if !success {
+			nonexistentSongs[i] = songs[i]
+			continue
+		}
+		results[i] = result
+	}
+
+	return results, nonexistentSongs, nil
 }
