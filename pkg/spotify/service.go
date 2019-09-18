@@ -7,9 +7,10 @@ import (
 
 type Service interface {
 	ReadSongs(r io.Reader) ([]models.Song, error)
-	SearchSong(song models.Song) (result models.SpotifySearchSimple, success bool, err error)
-	SearchSongs(songs []models.Song) ([]models.SpotifySearchSimple, []models.Song, error)
-	AddResultsToSpotifyPlaylist([]models.SpotifySearchSimple) error
-	AddNonexistentToFile([]models.Song) error
-	CreateSpotifyPlaylist(name string) error
+	SearchSong(song models.Song) (result string, success bool, err error)
+	SearchSongs(songs []models.Song) ([]string, []models.Song, error)
+	AddResultsToSpotifyPlaylist(playlistObj models.SpotifyPlaylistObject, results []string) error
+	AddNonexistentToFile(songs []models.Song, path string) error
+	CreateSpotifyPlaylist(name string) (models.SpotifyPlaylistObject, error)
+	AddToSpotifyPlaylist(playlistObj models.SpotifyPlaylistObject, results models.SpotifyTrackURIs) error
 }

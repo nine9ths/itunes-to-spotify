@@ -11,6 +11,7 @@ func main() {
 	pathToInputFile := flag.String("path", "", "Please provide the path to the input file")
 	playlistName := flag.String("playlist", "", "Please provide the name of the playlist to create")
 	token := flag.String("token", "", "Please provide a Spotify access token with the required scopes (check the README.md)")
+	pathToOutputFile := flag.String("outputPath", "", "Please provide the path to the output file")
 	flag.Parse()
 
 	if *pathToInputFile == "" {
@@ -25,6 +26,11 @@ func main() {
 
 	if *token == "" {
 		fmt.Println("Please provide a Spotify access token with the required scopes (check the README.md)")
+		return
+	}
+
+	if *pathToOutputFile == "" {
+		fmt.Println("Please provide the path to the desired output file e.g. ./itunes-to-spotify -outputPath=/home/test.txt")
 		return
 	}
 
@@ -48,9 +54,29 @@ func main() {
 		return
 	}
 
-	err = spotifyService.CreateSpotifyPlaylist(*playlistName)
+	spotifyPlaylistObj, err := spotifyService.CreateSpotifyPlaylist(*playlistName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
+	results, nonexistent, err := spotifyService.SearchSongs(songs)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	err = spotifyService.AddResultsToSpotifyPlaylist(spotifyPlaylistObj, results)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	err = spotifyService.AddNonexistentToFile(nonexistent, *pathToOutputFile)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Success.")
 }
