@@ -20,12 +20,12 @@ func main() {
 	}
 
 	if *playlistName == "" {
-		fmt.Println("Please provide the name of the playlist to create")
+		fmt.Println("Please provide the name of the playlist to create e.g. ./itunes-to-spotify -playlist=test")
 		return
 	}
 
 	if *token == "" {
-		fmt.Println("Please provide a Spotify access token with the required scopes (check the README.md)")
+		fmt.Println("Please provide a Spotify access token with the required scopes (check the README.md) e.g. ./itunes-to-spotify -token=example")
 		return
 	}
 

@@ -33,7 +33,7 @@ func (s spotifyService) ReadSongs(inputFile io.Reader) ([]models.Song, error) {
 
 	scanner := bufio.NewScanner(inputFile)
 	for scanner.Scan() {
-		s := strings.Split(scanner.Text(), "	")
+		s := strings.Split(scanner.Text(), "\t")
 		if len(s) < 2 {
 			return songs, errors.New("file incorrectly formatted")
 		}
