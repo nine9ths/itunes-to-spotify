@@ -54,13 +54,19 @@ func main() {
 		return
 	}
 
-	spotifyPlaylistObj, err := spotifyService.CreateSpotifyPlaylist(*playlistName)
+	userObj, err := spotifyService.GetSpotifyUserObject()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	results, nonexistent, err := spotifyService.SearchSongs(songs)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	spotifyPlaylistObj, err := spotifyService.CreateSpotifyPlaylist(*playlistName, userObj)
 	if err != nil {
 		fmt.Println(err)
 		return

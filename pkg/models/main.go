@@ -34,3 +34,7 @@ type SpotifyPlaylistObject struct {
 type SpotifyTrackURIs struct {
 	URIs []string `json:"uris"`
 }
+
+type SpotifyUserObject struct {
+	ID string `json:"id"`
+}

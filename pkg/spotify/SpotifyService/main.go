@@ -11,8 +11,11 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const SpotifyBaseUrl = "https://api.spotify.com/v1"
@@ -35,7 +38,7 @@ func (s spotifyService) ReadSongs(inputFile io.Reader) ([]models.Song, error) {
 	for scanner.Scan() {
 		s := strings.Split(scanner.Text(), "\t")
 		if len(s) < 2 {
-			return songs, errors.New("file incorrectly formatted")
+			return songs, nil
 		}
 
 		var song models.Song
@@ -52,7 +55,7 @@ func (s spotifyService) SearchSong(song models.Song) (result string, success boo
 	var simpleSearchResponse string
 	client := &http.Client{}
 
-	request, err := http.NewRequest("GET", SpotifyBaseUrl + SpotifySearchEndpoint + "?q=" + song.Artist + "%20" + song.Name, nil)
+	request, err := http.NewRequest("GET", SpotifyBaseUrl + SpotifySearchEndpoint + "?q=" + url.QueryEscape(song.Artist + " " + song.Name) + "&type=track", nil)
 	if err != nil {
 		return simpleSearchResponse, false, err
 	}
@@ -67,6 +70,15 @@ func (s spotifyService) SearchSong(song models.Song) (result string, success boo
 
 	if response.StatusCode == http.StatusUnauthorized {
 		return simpleSearchResponse, false, errors.New("access token is unauthorized, it might have expired")
+	}
+
+	if response.StatusCode == http.StatusTooManyRequests {
+		retryAfter, err := strconv.Atoi(response.Header.Get("Retry-After"))
+		if err != nil {
+			return simpleSearchResponse, false, err
+		}
+		time.Sleep(time.Duration(retryAfter) * time.Second)
+		return s.SearchSong(song)
 	}
 
 	if response.StatusCode >= 300 {
@@ -101,22 +113,22 @@ func (s spotifyService) SearchSongs(songs []models.Song) ([]string, []models.Son
 	results := make([]string, 0, len(songs))
 	nonexistentSongs := make([]models.Song, 0, len(songs))
 
-	for i := 0; i < len(songs); i++ {
+	for i := 1; i < len(songs); i++ {
 		result, success, err := s.SearchSong(songs[i])
 		if err != nil {
 			return results, nonexistentSongs, err
 		}
 		if !success {
-			nonexistentSongs[i] = songs[i]
+			nonexistentSongs = append(nonexistentSongs, songs[i])
 			continue
 		}
-		results[i] = result
+		results = append(results, result)
 	}
 
 	return results, nonexistentSongs, nil
 }
 
-func (s spotifyService) CreateSpotifyPlaylist(name string) (models.SpotifyPlaylistObject, error) {
+func (s spotifyService) CreateSpotifyPlaylist(name string, userObj models.SpotifyUserObject) (models.SpotifyPlaylistObject, error) {
 	var playlistPayload models.SpotifyPlaylist
 	var playlistObject models.SpotifyPlaylistObject
 	playlistPayload.Name = name
@@ -129,7 +141,7 @@ func (s spotifyService) CreateSpotifyPlaylist(name string) (models.SpotifyPlayli
 	}
 	b := bytes.NewBuffer(bodyBytes)
 
-	request, err := http.NewRequest("POST", SpotifyBaseUrl + SpotifyPlaylistsEndpoint, b)
+	request, err := http.NewRequest("POST", SpotifyBaseUrl + "/users/" + userObj.ID + SpotifyPlaylistsEndpoint, b)
 	if err != nil {
 		return playlistObject, err
 	}
@@ -171,14 +183,14 @@ func (s spotifyService) AddResultsToSpotifyPlaylist(playlistObj models.SpotifyPl
 	numOfSongs := len(results)
 	if numOfSongs > 100 {
 		iterations := int(math.Round(float64(numOfSongs / 100)))
-		for i := 0; i < iterations - 1; i++ {
+		for i := 0; i < iterations; i++ {
 			spotifyTrackURIs.URIs = results[i * 100:(i + 1) * 100]
 			err := s.AddToSpotifyPlaylist(playlistObj, spotifyTrackURIs)
 			if err != nil {
 				return err
 			}
 		}
-		spotifyTrackURIs.URIs = results[(iterations - 1) * 100:]
+		spotifyTrackURIs.URIs = results[iterations * 100:]
 		return s.AddToSpotifyPlaylist(playlistObj, spotifyTrackURIs)
 	}
 
@@ -243,4 +255,46 @@ func (s spotifyService) AddNonexistentToFile(songs []models.Song, path string) e
 	}
 
 	return nil
+}
+
+func (s spotifyService) GetSpotifyUserObject() (models.SpotifyUserObject, error) {
+	var userObj models.SpotifyUserObject
+
+	client := &http.Client{}
+
+	request, err := http.NewRequest("GET", SpotifyBaseUrl + "/me", nil)
+	if err != nil {
+		return userObj, err
+	}
+
+	request.Header.Set("Authorization", "Bearer " + s.Token)
+
+	response, err := client.Do(request)
+	if err != nil {
+		return userObj, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusUnauthorized {
+		return userObj, errors.New("access token is unauthorized, it might have expired")
+	}
+
+	if response.StatusCode >= 300 {
+		bodyBytes, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return userObj, err
+		}
+		return userObj, errors.New(string(bodyBytes))
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return userObj, err
+	}
+	err = json.Unmarshal(body, &userObj)
+	if err != nil {
+		return userObj, err
+	}
+
+	return userObj, nil
 }

@@ -11,6 +11,7 @@ type Service interface {
 	SearchSongs(songs []models.Song) ([]string, []models.Song, error)
 	AddResultsToSpotifyPlaylist(playlistObj models.SpotifyPlaylistObject, results []string) error
 	AddNonexistentToFile(songs []models.Song, path string) error
-	CreateSpotifyPlaylist(name string) (models.SpotifyPlaylistObject, error)
+	GetSpotifyUserObject() (models.SpotifyUserObject, error)
+	CreateSpotifyPlaylist(name string, userObj models.SpotifyUserObject) (models.SpotifyPlaylistObject, error)
 	AddToSpotifyPlaylist(playlistObj models.SpotifyPlaylistObject, results models.SpotifyTrackURIs) error
 }
